@@ -1,0 +1,546 @@
+# Example from:- https://www.espboards.dev/blog/esphome-configuring-elecrow-7-inch-display/
+packages:
+  lvgl: !include "packages/Elecrow/lvgl-test.yaml"
+#  lvgl1: !include "packages/elecrow-1/lvgl-test1.yaml"
+  fonts: !include "fonts/fonts.yaml"
+  colors: !include "packages/colors.yaml"
+#  images: !include "img/images.yaml"
+  #sensors_wifi_etc: !include "packages/sensors_wifi_etc.yaml"
+  sensors_ha: !include "packages/7in_panels/sensors_ha.yaml"
+
+esphome:
+  name: "elecrow-1"
+  friendly_name: "Elecrow LCD-1"
+  platformio_options:
+    build_flags: "-DBOARD_HAS_PSRAM"
+    board_build.esp-idf.memory_type: qio_opi
+    board_build.flash_mode: dio
+
+  on_boot: 
+    - priority: 800
+      then:
+        - script.execute: toggle_leds
+
+#  on_boot:
+#    then:
+#    - logger.log: "Onboot seq"
+#    - lambda: !lambda |-
+#        // Set the pin mode to OUTPUT
+#        pinMode(43, 1);
+#
+#        // Write the digital value (HIGH or LOW) to the pin
+#        digitalWrite(43, 1);
+#       ESP_LOGD("main", "Starting");
+#       id(p_c_a)->pin_mode(0, esphome::gpio::FLAG_OUTPUT);
+#       id(p_c_a)->digital_write(0, false);
+#       ESP_LOGD("main", "Done???");
+#       id(p_c_a)->pin_mode(1, esphome::gpio::FLAG_OUTPUT);
+#       id(p_c_a)->digital_write(1, false);
+
+esp32:
+  board: esp32-s3-devkitc1-n4r8
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHFREQ: "80MHz" # this is needed for flashing
+      CONFIG_ESPTOOLPY_FLASHMODE_QIO: y
+      CONFIG_FLASHMODE_QIO: y
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240: y
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: '240'
+      CONFIG_SPIRAM_RODATA: "y"
+
+# Enable PSRAM on ESP32-S3
+psram:
+  mode: octal
+  speed: 80MHz 
+# Enable logging
+logger:
+  level: DEBUG
+  logs:
+    touch: DEBUG
+    display: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "xhKn8BNx3gxWmVr324g+PcFbJqkHmghHG4iW1/nqbLQ="
+ota:
+  - platform: esphome
+    password: "80c51de12799db4826e77439999d3ceb"
+
+# IP Reservation:-192.168.59.199
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Elecrowlcd Fallback Hotspot"
+    password: "0xqFEFl8NeOC"
+
+web_server:
+  version: 3
+  include_internal: True
+
+captive_portal:
+
+
+output:
+  - platform: ledc
+    pin: 2
+    frequency: 1220
+    id: gpio_backlight_pwm
+
+light:
+  - platform: monochromatic
+    output: gpio_backlight_pwm
+    name: ${devicename} Display Backlight
+    id: back_light
+    restore_mode: ALWAYS_ON
+
+#touchscreen:
+#  platform: gt911
+#  id: my_touchscreen
+#  display: my_display
+#  interrupt_pin: 38
+
+#touchscreen:
+#  platform: gt911
+#  id: touch_gt911
+#  address: 0x18
+#  address: 0x5D #????
+
+# Example for MaTouch ESP32-S3 Parallel TFT with Touch 7“, https://www.makerfabs.com/esp32-s3-parallel-tft-with-touch-7-inch.html
+# From:- https://github.com/Makerfabs/ESP32-S3-Parallel-TFT-with-Touch-7inch/blob/main/example/esphome/config/Matouch_ESP32S3_7.yaml
+#i2c:
+#  - id: touch_i2c
+#    sda: 19
+#    scl: 20
+#    scan: true
+
+#touchscreen:
+#  - platform: gt911
+#    display: my_display
+#    id: touch_screen
+#    update_interval: 16ms
+#    i2c_id: touch_i2c
+#    transform:
+#      swap_xy: false
+#      mirror_x: false
+#      mirror_y: false
+touchscreen:
+  - platform: gt911
+    id: my_touchscreen
+    i2c_id: i2c_bus
+# -------------------------------------------------------
+
+# -------------------------------------------------------
+# Latest Elecrow Example
+# -------------------------------------------------------
+
+# I2C bus configuration
+i2c:
+  id: i2c_bus
+  sda: 19
+  scl: 20
+#  frequency: 400kHz # Added to try & fix full Crash when Touch is enabled
+  scan: True # As Above.
+
+
+# PCA9554 GPIO extender for display reset
+
+pca9554:
+  - id: p_c_a
+    address: 0x20 # Originally 0x20 Which applies to PCA9554
+    i2c_id: i2c_bus
+
+switch:
+#---------- Test Uart Port ------------------------------------------------------
+  - platform: gpio
+    pin: 43 # TXD0
+    inverted: True
+    id: out_pin_43
+    name: "Pin 43 Output"
+  - platform: gpio
+    pin: 44 # RXD0
+    inverted: True
+    id: out_pin_44
+    name: "Pin 44 Output"
+
+
+#  - platform: gpio
+#    pin: 38
+#    id: output_pin
+#    name: "Pin 38 Output"
+#
+#  - platform: gpio
+#    name: "GT911 Reset"
+#    pin:
+#      pca9554: p_c_a
+#      number: 0
+#      mode:
+#        output: true
+#      inverted: false
+#    id: gt911_reset
+#    restore_mode: RESTORE_DEFAULT_ON
+#    on_state:
+#      then:
+#        lvgl.widget.update:
+#          id: gt911_reset_but
+#          state:
+#            checked: !lambda return x;
+#
+#  - platform: gpio
+#    name: "GT911 INT"
+#    pin:
+#      pca9554: p_c_a
+#      number: 1
+#      mode:
+#        output: true
+#      inverted: false
+#    id: gt911_int
+script:
+  - id: toggle_leds
+    mode: queued
+    then:
+      - switch.turn_off: out_pin_43
+      - switch.turn_off: out_pin_44
+      - delay: 500ms
+      - switch.turn_on: out_pin_43
+      - delay: 300ms
+      - switch.turn_on: out_pin_44
+      - delay: 1000ms
+      - switch.turn_off: out_pin_44
+      - delay: 300ms
+      - switch.turn_off: out_pin_43
+      - delay: 500ms
+      - switch.turn_on: out_pin_43
+      - delay: 300ms
+      - switch.turn_on: out_pin_44
+      - delay: 1000ms
+      - switch.turn_off: out_pin_44
+      - delay: 300ms
+      - switch.turn_off: out_pin_43
+      - delay: 500ms
+      - switch.turn_on: out_pin_43
+      - delay: 300ms
+      - switch.turn_on: out_pin_44
+      - delay: 1000ms
+      - switch.turn_off: out_pin_44
+      - delay: 300ms
+      - switch.turn_off: out_pin_43
+#
+#script:
+#  - id: init_touch
+#    mode: queued
+#    then:
+#      - switch.turn_off: gt911_reset
+#      - switch.turn_off: gt911_int
+#      - delay: 20ms
+#      - switch.turn_on: gt911_reset
+#      - delay: 100ms
+#      - switch.turn_off: gt911_int
+
+#touchscreen:
+#  - platform: gt911
+#    id: my_touchscreen
+#    i2c_id: i2c_bus
+
+# ---------------------------------------------------------
+# End of Latest Example
+# ---------------------------------------------------------
+
+display:
+  - platform: rpi_dpi_rgb
+    id: my_display
+    data_pins:
+      red: [14, 21, 47, 48, 45]
+      green: [9, 46, 3, 8, 16, 1]
+      blue: [15, 7, 6, 5, 4]
+    de_pin: 41
+    hsync_pin: 39
+    vsync_pin: 40
+    pclk_pin: 0
+
+    hsync_front_porch: 40
+    hsync_pulse_width: 48
+    hsync_back_porch: 13 # 40 in Specs Original is 13
+
+    vsync_front_porch: 1
+    vsync_pulse_width: 31
+    vsync_back_porch: 13
+
+    pclk_inverted: true
+    color_order: RGB
+    auto_clear_enabled: false
+    update_interval: 30s
+    dimensions:
+      width: 800
+      height: 480
+
+#    lambda: |-
+#      auto black = Color(0, 0, 0);
+#      auto red = Color(255, 0, 0);
+#      auto green = Color(0, 255, 0);
+#      auto blue = Color(0, 0, 255);
+#      auto white = Color(255, 255, 255);
+#      it.filled_circle(20, 32, 15, black);
+#      it.filled_circle(40, 32, 15, red);
+#      it.filled_circle(60, 32, 15, green);
+#      it.filled_circle(80, 32, 15, blue);
+#      it.filled_circle(100, 32, 15, white);
+
+#font:
+#  - file: "fonts/RobotoCondensed-VariableFont_wght.ttf"
+#    id: roboto_18
+#    size: 18
+#    bpp: 4
+#    extras:
+#      - file: "fonts/materialdesignicons-webfont.ttf"
+#        glyphs: [
+#          "\U000F02D1", # mdi-heart
+#          "\U000F05D4", # mdi-airplane-landing
+#          "\U000F035B", # mdi-memory
+#          "\U000F0606", # mdi-pool
+#          ]
+#          
+#  - file: "fonts/RobotoCondensed-VariableFont_wght.ttf"
+#    id: roboto_20
+#    size: 20
+#    bpp: 4
+#    extras:
+#      - file: "fonts/materialdesignicons-webfont.ttf"
+#        glyphs: [
+#          "\U000F02D1", # mdi-heart
+#          "\U000F05D4", # mdi-airplane-landing
+#          "\U000F035B", # mdi-memory
+#          "\U000F0606", # mdi-pool
+#          ]
+#          
+#  - file: "fonts/RobotoCondensed-VariableFont_wght.ttf"
+#    id: roboto_24
+#    size: 24
+#    bpp: 4
+#  - file: "fonts/RobotoCondensed-VariableFont_wght.ttf"
+#    id: roboto_36
+#    size: 36
+#    bpp: 4
+#  - file: "fonts/RobotoCondensed-VariableFont_wght.ttf"
+#    id: roboto_icons_36
+#    size: 36
+#    bpp: 4
+#  - file: "fonts/RobotoCondensed-VariableFont_wght.ttf"
+#    id: roboto_48
+#    size: 48
+#    bpp: 4
+#  - file: "fonts/RobotoCondensed-VariableFont_wght.ttf"
+#    id: roboto_icons_100
+#    size: 100
+#    bpp: 4
+#    extras:
+#      - file: "fonts/materialdesignicons-webfont.ttf"
+#        glyphs: [
+#          "\U000F02D1", # mdi-heart
+#          "\U000F05D4", # mdi-airplane-landing
+#          "\U000F035B", # mdi-memory
+#          "\U000F0606", # mdi-pool
+#          ]
+
+
+#image:
+#  - file: img/logo.png
+#    type: RGB565
+#    id: logo_image
+#    resize: 100x100
+#  - file: "img/light.png"
+#    id: on_light
+#    resize: 50x50
+#    type: RGB565
+#  - file: "img/small_hum.png"
+#    id: small_hum
+#    resize: 50x75
+#    type: RGB565
+#  - file: "img/small_logo.png"
+#    id: small_logo
+#    resize: 250x52
+#    type: RGB565
+#  - file: "img/small_off.png"
+#    id: small_off
+#    resize: 50x75
+#    type: RGB565
+#  - file: "img/small_temp.png"
+#    id: small_temp
+#    resize: 50x75
+#    type: RGB565
+#  - file: "img/no_light.png"
+#    id: no_light
+#    resize: 50x50
+#    type: RGB565
+
+# lvgl Package Added
+
+#binary_sensor:
+#  - platform: homeassistant
+#    id: spasolarpumps
+#    entity_id: switch.spa_solar_pump
+#    publish_initial_state: true
+#    on_state:
+#      then:
+#        - lvgl.widget.update:
+#            id: spasolar_but
+#            state:
+#             checked: !lambda return x;
+#  - platform: homeassistant
+#    id: spapump
+#    entity_id: switch.energy_3_shed
+#    publish_initial_state: true
+#    on_state:
+#      then:
+#        - lvgl.widget.update:
+#            id: spapump_but
+#            state:
+#             checked: !lambda return x;
+#
+#
+#sensor:
+#  - platform: homeassistant
+#    name: "Current Temp"
+#    id: spatmp_cur_2
+#    entity_id: sensor.spa_1_ts_cur # e.g., sensor.living_room_temperature
+#    internal: True # Keep it internal, for use in ESPHome only
+#    on_value:
+#      then:
+#        - lvgl.arc.update:
+#            id: gauge1_arc
+#            value: !lambda return x;
+#        - lvgl.label.update:
+#            id: val1_text
+#            text:
+#              format: "%2.1f"
+#              args: [ 'x' ]
+#  - platform: homeassistant
+#    name: "Temp Rise"
+#    id: spatmp_dif_2
+#    entity_id: sensor.spa_temp_rise # e.g., sensor.living_room_temperature
+#    internal: True # Keep it internal, for use in ESPHome only
+#    on_value:
+#      then:
+#        - lvgl.arc.update:
+#            id: gauge2_arc
+#            value: !lambda return x;
+#        - lvgl.label.update:
+#            id: val2_text
+#            text:
+#              format: "%2.1f"
+#              args: [ 'x' ]
+#  - platform: homeassistant
+#    name: "Temp Reqd"
+#    id: spatmp_req_2
+#    entity_id: sensor.spa_temp_req # e.g., sensor.living_room_temperature
+#    internal: True # Keep it internal, for use in ESPHome only
+#    on_value:
+#      then:
+#        - lvgl.arc.update:
+#            id: gauge3_arc
+#            value: !lambda return x;
+#        - lvgl.label.update:
+#            id: val3_text
+#            text:
+#              format: "%2.1f"
+#              args: [ 'x' ]
+#  - platform: homeassistant
+#    name: "Ambient Temp"
+#    id: spatmp_amb_2
+#    entity_id: sensor.spa_1_ts_amb # e.g., sensor.living_room_temperature
+#    internal: True # Keep it internal, for use in ESPHome only
+#    on_value:
+#      then:
+#        - lvgl.arc.update:
+#            id: gauge4_arc
+#            value: !lambda return x;
+#        - lvgl.label.update:
+#            id: val4_text
+#            text:
+#              format: "%2.1f"
+#              args: [ 'x' ]
+#  - platform: homeassistant
+#    name: "Return Temp"
+#    id: spatmp_ret_2
+#    entity_id: sensor.spa_1_ts_out # e.g., sensor.living_room_temperature
+#    internal: True # Keep it internal, for use in ESPHome only
+#    on_value:
+#      then:
+#        - lvgl.arc.update:
+#            id: gauge5_arc
+#            value: !lambda return x;
+#        - lvgl.label.update:
+#            id: val5_text
+#            text:
+#              format: "%2.1f"
+#              args: [ 'x' ]
+#  - platform: homeassistant
+#    name: "Flow Rate"
+#    id: spa_rtn_flo_2
+#    entity_id: sensor.spa_1_spa_1_return_flow # e.g., sensor.living_room_temperature
+#    internal: True # Keep it internal, for use in ESPHome only
+#    on_value:
+#      then:
+#        - lvgl.arc.update:
+#            id: gauge6_arc
+#            value: !lambda return x;
+#        - lvgl.label.update:
+#            id: val6_text
+#            text:
+#              format: "%2.1f"
+#              args: [ 'x' ]
+#  
+#  - platform: homeassistant
+#    id: derivitive_temp_rise
+#    entity_id: sensor.trst
+#    on_value:
+#      - lvgl.label.update:
+#          id: dtemp_val
+#          text: 
+#            format: "%2.1f"
+#            args: [ 'x' ]
+#
+#  - platform: homeassistant
+#    name: "Set Temp"
+#    id: spatmp_set
+#    entity_id: input_number.spa_set_temp # e.g., sensor.living_room_temperature
+#    internal: True # Keep it internal, for use in ESPHome only
+#    on_value:
+#      then:
+#        - lvgl.label.update:
+#            id: stemp_val
+#            text:
+#              format: "%2.1f"
+#              args: [ 'x' ]
+
+## Sensor Block for Standard Configuration.
+## Uptime, Wifi Info etc
+##
+text_sensor:
+
+  - platform: wifi_info
+    ip_address:
+      name: "Elecrow-1 Address"
+      id: elecrow1_address
+    bssid:
+      name: Elecrow-1 AP Mac Address
+      id: elecrow1_ap
+      filters:
+        substitute:
+          - "84:D8:1B:DD:4E:F4 -> Front_Office"
+          - "00:5F:67:A0:71:F0 -> Centre_Office"
+          - "C0:06:C3:35:A7:FE -> Lounge_Room"
+          - "00:31:92:1B:38:22 -> Bbq_Area"
+          - "50:C7:BF:D3:38:5A -> Back_Room"
+          - "B0:4E:26:E4:41:FE -> Outdoor"
+          - "50:C7:BF:D3:3C:61 -> Shed"
+    mac_address:
+      name: "Elecro-1 Wifi Mac Address"
+## End of Standard Text Sensors.      
+
+  
+
